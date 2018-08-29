@@ -1,0 +1,216 @@
+version: '2'
+services:
+  jenkins:
+      image: "jenkins:2.19.2"
+      ports:
+        - "49001:8080"
+      restart: "always"
+      volumes:
+        - "./data-jenkins:/var/jenkins_home"
+  authdb:
+      image: mysql:5.7
+      environment:
+          MYSQL_DATABASE: elevysic_auth
+          MYSQL_USER: elevysi
+          MYSQL_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: root
+      volumes:
+          - "./my.cnf:/etc/mysql/conf.d/config-file.cnf"
+          - "./authdb:/var/lib/mysql:rw"
+      ports:
+          - "3307:3306"
+      networks:
+          - network-elevysi
+  
+  socialdb:
+      image: mysql:5.7
+      environment:
+          MYSQL_DATABASE: elevysic_socialdb
+          MYSQL_USER: elevysi
+          MYSQL_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: root
+      volumes:
+          - "./my.cnf:/etc/mysql/conf.d/config-file.cnf"
+          - "./socialdb:/var/lib/mysql:rw"
+      ports:
+          - "3308:3306"
+      networks:
+          - network-elevysi
+  
+  shopdb:
+      image: mysql:5.7
+      environment:
+          MYSQL_DATABASE: elevysic_shopdb
+          MYSQL_USER: elevysi
+          MYSQL_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: root
+      volumes:
+          - "./my.cnf:/etc/mysql/conf.d/config-file.cnf"
+          - "./shopdb:/var/lib/mysql:rw"
+      ports:
+          - "3309:3306"
+      networks:
+          - network-elevysi
+  blogdb:
+      image: mysql:5.7
+      environment:
+          MYSQL_DATABASE: elevysic_blogdb
+          MYSQL_USER: elevysi
+          MYSQL_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: root
+      volumes:
+          - "./my.cnf:/etc/mysql/conf.d/config-file.cnf"
+          - "./blogdb:/var/lib/mysql:rw"
+      ports:
+          - "3310:3306"
+      networks:
+          - network-elevysi
+          
+  eurekaserver:
+   image:   elevysi/eurekaserver:dnsserver
+   ports:
+       - "8761:8761"
+   networks:
+          - network-elevysi
+  
+  configserver:
+    image: elevysi/confserver:confserver
+    ports:
+       - "8888:8888"
+    networks:
+          - network-elevysi
+    environment:
+       SPRING_PROFILES_ACTIVE: "container"
+       EUREKASERVER_URI: "http://eurekaserver:8761/eureka/"
+       EUREKASERVER_PORT: 8761
+       ENCRYPT_KEY:       "IMSYMMETRIC"
+  
+  zuulserver:
+    image: elevysi/zuulserver:proxyserver
+    ports:
+      - "5555:5555"
+    networks:
+          - network-elevysi
+    environment:
+      PROFILE: "container"
+      SERVER_PORT: "5555"
+      CONFIGSERVER_URI: "http://configserver:8888"
+      EUREKASERVER_URI: "http://eurekaserver:8761/eureka/"
+      EUREKASERVER_PORT:        "8761"
+      DATABASESERVER_PORT:      "3306"
+      CONFIGSERVER_PORT:        "8888"
+
+  authservice:
+    image: elevysi/authservice:1.0.1
+    depends_on:
+      - authdb
+    ports:
+      - "8100:8100"
+    networks:
+          - network-elevysi
+    environment:
+      PROFILE: "container"
+      SERVER_PORT: "8100"
+      CONFIGSERVER_URI: "http://configserver:8888"
+      EUREKASERVER_URI: "http://eurekaserver:8761/eureka/"
+      EUREKASERVER_PORT:        "8761"
+      BLOGSERVER_URI: "http://blogservice:8400"
+      SOCIALSERVER_URI: "http://socialservice:8200"
+      AUTHSERVER_URI: "http://authservice:8100"
+      UPLOAD_PATH: "/media/elvis/DataHDD1/JAVAPro/Uploads/images/"
+      DATABASESERVER_PORT:      "3306"
+      DATABASE_HOST: "authdb"
+      DATABASE_USER: "elevysi"
+      DATABASE_PASSWORD: "root"
+      DATABASE_NAME: "elevysic_auth"
+      CONFIGSERVER_PORT:        "8888"
+      ZUULSERVER_PORT:          "5555"
+  
+  socialservice:
+    image: elevysi/social:1.0.1
+    depends_on:
+      - socialdb
+      - authservice
+    ports:
+      - "8200:8200"
+    networks:
+          - network-elevysi
+    environment:
+      PROFILE: "container"
+      SERVER_PORT: "8200"
+      CONFIGSERVER_URI: "http://configserver:8888"
+      EUREKASERVER_URI: "http://eurekaserver:8761/eureka/"
+      EUREKASERVER_PORT:        "8761"
+      BLOGSERVER_URI: "http://blogservice:8400"
+      SOCIALSERVER_URI: "http://socialservice:8200"
+      AUTHSERVER_URI: "http://authservice:8100"
+      UPLOAD_PATH: "/media/elvis/DataHDD1/JAVAPro/Uploads/images/"
+      DATABASESERVER_PORT:      "3306"
+      DATABASE_HOST: "socialdb"
+      DATABASE_USER: "elevysi"
+      DATABASE_PASSWORD: "root"
+      DATABASE_NAME: "elevysic_socialdb"
+      CONFIGSERVER_PORT:        "8888"
+      ZUULSERVER_PORT:          "5555"
+  
+  shopservice:
+    image: elevysi/shop:1.0.1
+    depends_on:
+      - shopdb
+      - authservice
+      - socialservice
+    ports:
+      - "8300:8300"
+    networks:
+          - network-elevysi
+    environment:
+      PROFILE: "container"
+      SERVER_PORT: "8300"
+      CONFIGSERVER_URI: "http://configserver:8888"
+      EUREKASERVER_URI: "http://eurekaserver:8761/eureka/"
+      EUREKASERVER_PORT:        "8761"
+      BLOGSERVER_URI: "http://blogservice:8400"
+      SOCIALSERVER_URI: "http://socialservice:8200"
+      AUTHSERVER_URI: "http://authservice:8100"
+      UPLOAD_PATH: "/media/elvis/DataHDD1/JAVAPro/Uploads/images/"
+      DATABASESERVER_PORT:      "3306"
+      DATABASE_HOST: "shopdb"
+      DATABASE_USER: "elevysi"
+      DATABASE_PASSWORD: "root"
+      DATABASE_NAME: "elevysic_shopdb"
+      CONFIGSERVER_PORT:        "8888"
+      ZUULSERVER_PORT:          "5555"
+      
+  blogservice:
+    image: elevysi/blog:1.0.1
+    depends_on:
+      - blogdb
+      - authservice
+    ports:
+      - "8400:8400"
+    networks:
+          - network-elevysi
+    environment:
+      PROFILE: "container"
+      SERVER_PORT: "8400"
+      CONFIGSERVER_URI: "http://configserver:8888"
+      EUREKASERVER_URI: "http://eurekaserver:8761/eureka/"
+      EUREKASERVER_PORT:        "8761"
+      DATABASESERVER_PORT:      "3306"
+      BLOGSERVER_URI: "http://blogservice:8400"
+      SOCIALSERVER_URI: "http://socialservice:8200"
+      AUTHSERVER_URI: "http://authservice:8100"
+      UPLOAD_PATH: "/media/elvis/DataHDD1/JAVAPro/Uploads/images/"
+      DATABASE_HOST: "blogdb"
+      DATABASE_USER: "elevysi"
+      DATABASE_PASSWORD: "root"
+      DATABASE_NAME: "elevysic_blogdb"
+      CONFIGSERVER_PORT:        "8888"
+      ZUULSERVER_PORT:          "5555"
+  
+#volumes:
+#  db_data: "./Applications/MAMP/db/mysql/"
+networks:
+  network-elevysi:
+    driver: bridge
+  
